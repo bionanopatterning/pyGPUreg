@@ -80,4 +80,4 @@ plt.title("numpy FFT")
 plt.show()
 ```
 
-![](res/FFT_example.png)
+![](res/FFT_example.PNG)
