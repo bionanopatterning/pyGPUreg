@@ -26,8 +26,8 @@ import time
 
 reg.init()
 
-template = tifffile.imread("C:/Users/mart_/Desktop/pygpureg/template.tif")
-image = tifffile.imread("C:/Users/mart_/Desktop/pygpureg/subject.tif")
+template = tifffile.imread("template.tif")
+image = tifffile.imread("subject.tif")
 
 timer = time.time()
 registered_image, shift = reg.phase_correlation(template, image, apply_shift=True, subpixel_mode=pygpureg.SUBPIXEL_MODE_COM, edge_mode=pygpureg.EDGE_MODE_ZERO, interpolation_mode=pygpureg.INTERPOLATION_MODE_LINEAR)
