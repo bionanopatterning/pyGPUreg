@@ -24,7 +24,7 @@ import tifffile
 import matplotlib.pyplot as plt
 import time
 
-reg.init()
+reg.init(image_size=256)
 
 template = tifffile.imread("template.tif")
 image = tifffile.imread("subject.tif")
@@ -49,7 +49,7 @@ plt.show()
 ```
 ![](res/Registration_example.PNG)
 ```
-Registration took: 0.0133 seconds.
+Registration took: 0.0090 seconds.
 ```
 
 #### 2D FFT on the GPU ####

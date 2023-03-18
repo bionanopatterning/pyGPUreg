@@ -17,7 +17,7 @@ import tifffile
 import matplotlib.pyplot as plt
 import time
 
-reg.init()
+reg.init(image_size=256)
 
 template = tifffile.imread("C:/Users/mart_/Desktop/pygpureg/template.tif")
 image = tifffile.imread("C:/Users/mart_/Desktop/pygpureg/subject.tif")
