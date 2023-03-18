@@ -39,8 +39,8 @@ texture_resample_b: Texture
 
 def init(create_window=True, image_size=None):
     """
-    Initialize pyGPUfit.
-    :param create_window: bool (default True). When True, pyGPUfit creates a glfw window context for OpenGL. When using pyGPUfit within a project that already has an OpenGL context, no window needs to be created.
+    Initialize pyGPUreg.
+    :param create_window: bool (default True). When True, pyGPUreg creates a glfw window context for OpenGL. When using pyGPUreg within a project that already has an OpenGL context, no window needs to be created.
     :param image_size: None or int. must be a power of 2. Specify the size of the input images in order to reserve space on the GPU. Can be changed after calling init() by calling set_image_size(image_size) - is also changed automatically when cross_correlation() is called with arguments of a different shape than the previously set image size. When None, textures are not initialized until they are actually needed.
     """
     global window, cs_butterfly, cs_fft, cs_fft_pi, cs_multiply, cs_resample
@@ -54,7 +54,7 @@ def init(create_window=True, image_size=None):
         glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, GLFW_CONTEXT_VERSION_MINOR)
         glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
         glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, GL_TRUE)
-        window = glfw.create_window(2, 2, "pyGPUfit hidden window", None, None)
+        window = glfw.create_window(2, 2, "pyGPUreg hidden window", None, None)
         glfw.make_context_current(window)
 
     # compile shaders
@@ -234,10 +234,10 @@ def gpu_fft(image, image2=None):
 
     if image.shape != (image_size, image_size):
         raise Exception(
-            f"Image size is {image.shape} but should be ({image_size}, {image_size}). Call pyGPUfit.set_image_size() to change the expected image size")
+            f"Image size is {image.shape} but should be ({image_size}, {image_size}). Call pyGPUreg.set_image_size() to change the expected image size")
     if image2 is not None and image2.shape != (image_size, image_size):
         raise Exception(
-            f"Image size is {image.shape} but should be ({image_size}, {image_size}). Call pyGPUfit.set_image_size() to change the expected image size")
+            f"Image size is {image.shape} but should be ({image_size}, {image_size}). Call pyGPUreg.set_image_size() to change the expected image size")
 
     data = np.zeros((image_size, image_size, 4))
     data[:, :, 0] = image
@@ -275,10 +275,10 @@ def phase_correlation(template_image, moved_image, apply_shift=True, edge_mode=E
 
     if template_image.shape != (image_size, image_size):
         raise Exception(
-            f"Image size is {template_image.shape} but should be ({image_size}, {image_size}). Call pyGPUfit.set_image_size() to change the expected image size")
+            f"Image size is {template_image.shape} but should be ({image_size}, {image_size}). Call pyGPUreg.set_image_size() to change the expected image size")
     if moved_image.shape != (image_size, image_size):
         raise Exception(
-            f"Image size is {template_image.shape} but should be ({image_size}, {image_size}). Call pyGPUfit.set_image_size() to change the expected image size")
+            f"Image size is {template_image.shape} but should be ({image_size}, {image_size}). Call pyGPUreg.set_image_size() to change the expected image size")
 
     data = np.zeros((image_size, image_size, 4))
     data[:, :, 0] = template_image
