@@ -4,7 +4,7 @@ pyGPUreg is a minimal Python module for GPU-accelerated image registration desig
 The module works by computing the phase correlation of input images on the GPU. Our implementation of FFTs on the GPU is largely based on the discussion and code in Fynn-Jorin Flügge's 'Realtime GPGPU FFT Ocean Water Simulation' (doi.org/10.15480/882.1436). pyGPUfit uses OpenGL, so a CUDA compatible card is not required.  
 
 ### Usage ###
-For now, pyGPUfit only works on images that are square and with size 2^n (e.g. 128, 256, 512, etc. pixel width and height)
+For now, pyGPUreg only works on images that are square and with size 2^n (e.g. 128, 256, 512, etc. pixel width and height)
 
 #### Initialization ####
 Prior to calling any of the core functions, pyGPUreg has to be initialized.
@@ -15,7 +15,7 @@ import pyGPUreg as reg
 reg.init(create_window=True)
 ```
 
-We use glfw to create an OpenGL context, and since glfw requires a window to be opened we create a hidden window in the init function. You can ignore this. To use pyGPUfit in an application that already has an OpenGL context, call init() with create_window=False.
+We use glfw to create an OpenGL context, and since glfw requires a window to be opened we create a hidden window in the init function. You can ignore this. To use pyGPUreg in an application that already has an OpenGL context, call init() with create_window=False.
 
 #### Drift correction ####
 ```
