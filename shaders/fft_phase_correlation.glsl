@@ -11,5 +11,5 @@ void main(void)
     float amplitude = sqrt(pow(val.r * val.b + val.g * val.a, 2) + pow(val.b * val.g - val.r * val.a, 2));
     float real = (val.r * val.b + val.g * val.a) / amplitude;
     float imag = (val.b * val.g - val.r * val.a) / amplitude;
-    imageStore(FTs, x, vec4(0.0, 0.0, real, imag));
+    imageStore(FTs, x, vec4(real, imag, real, imag));
 }
