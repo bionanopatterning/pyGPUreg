@@ -52,7 +52,7 @@ void horizontalButterflies ()
 		p = complex(p_.z, p_.w);
 		q = complex(q_.z, q_.w);
 		G = add(p,mul(w, q));
-		imageStore(pingpong1, x, vec4(G.real, G.im, H.real,	H.im));
+		imageStore(pingpong1, x, vec4(H.real, H.im, G.real,	G.im));
 	}
 	else if (pingpong == 1)
 	{ 
@@ -68,7 +68,7 @@ void horizontalButterflies ()
 		p = complex(p_.z, p_.w);
 		q = complex(q_.z, q_.w);
 		G = add(p,mul(w, q));
-		imageStore(pingpong0, x, vec4(G.real, G.im, H.real,	H.im));
+		imageStore(pingpong0, x, vec4(H.real, H.im, G.real,	G.im));
 	}
 }
 
