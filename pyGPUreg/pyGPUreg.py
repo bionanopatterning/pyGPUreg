@@ -530,7 +530,6 @@ def register_to_template(image, apply_shift=True, edge_mode=EDGE_MODE_ZERO, subp
 
     # compute FFT
     bind_and_launch_fft_single_compute_shaders(texture_rg_I)
-    _debug_show_img(texture_rg_I, "input FFT")
     # compute phase correlation
     cs_multiply_single.bind()
     glBindImageTexture(0, texture_rg_T.renderer_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RG32F)
@@ -538,18 +537,14 @@ def register_to_template(image, apply_shift=True, edge_mode=EDGE_MODE_ZERO, subp
     glDispatchCompute(*compute_space_size)
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
     cs_multiply_single.bind()
-    _debug_show_img(texture_rg_I, "phase corr FFT")
     # phase correlation is now in texture_rg_I. Compute its FFT.
     bind_and_launch_fft_single_compute_shaders(texture_rg_I, do_inversion_permutation=False)
     glMemoryBarrier(GL_TEXTURE_UPDATE_BARRIER_BIT)
 
-    _debug_show_img(texture_rg_I, "phase corre INverse FFT")
     # get phase correlation image and find maximum
     texture_rg_I.bind()
     pcorr = np.fft.fftshift(glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT), axes=(0, 1))
     #pcorr[image_size//2, image_size//2] = 0
-    plt.imshow(pcorr)
-    plt.show()
     dx, dy = detect_subpixel_maximum(pcorr, mode=subpixel_mode)
     if not apply_shift:
         return dx, dy
