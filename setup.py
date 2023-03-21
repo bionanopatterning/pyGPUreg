@@ -2,11 +2,11 @@ from setuptools import setup, find_packages
 
 setup(
     name='pyGPUreg',
-    version='0.0.9',
+    version='0.0.10',
     license='GPLv3',
     author="Mart G.F. Last",
     author_email='m.g.f.last@lumc.nl',
-    description='GPU-accelerated image registration.\ngithub.com/bionanopatterning/pyGPUfit',
+    description='GPU-accelerated image registration.\ngithub.com/bionanopatterning/pyGPUreg',
     packages=find_packages(),
     package_data={'pyGPUreg': ['*.glsl', 'shaders/*glsl']},
     include_package_data=True,
