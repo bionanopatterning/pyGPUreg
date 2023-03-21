@@ -13,6 +13,5 @@ void main(void)
     float amplitude = sqrt(pow(T.r * I.r + T.g * I.g, 2) + pow(I.r * T.g - T.r * I.g, 2));
     float real = (T.r * I.r + T.g * I.r) / amplitude;
     float imag = (I.r * T.g - T.r * I.g) / amplitude;
-    //imageStore(FT_I, x, vec4(real, imag, 0.0, 0.0));
-    imageStore(FT_I, x, vec4(T.r, T.g, 0.0, 0.0));
+    imageStore(FT_I, x, vec4(real, imag, 0.0, 0.0));
 }
