@@ -1,4 +1,4 @@
-from opengl_classes import *
+from .opengl_classes import *
 import glfw
 import math
 import matplotlib.pyplot as plt
@@ -8,13 +8,13 @@ EDGE_MODE_ZERO = 0
 EDGE_MODE_CLAMP = 1
 EDGE_MODE_REFLECT = 2
 SUBPIXEL_MODE_NONE = 0  # no subpixel peak detection. limits shift resolution to pixel size.
-SUBPIXEL_MODE_COM = 1  # detect sub-pixel shift by calculating the center of mass of the amplitude peak
+SUBPIXEL_MODE_COM = 1  # detect sub-pixel shift by calculating the center of mass of the peak in the FFT(phase correlation)
 INTERPOLATION_MODE_NEAREST = 0
 INTERPOLATION_MODE_LINEAR = 1
 
 # Advanced settings
 COM_RADIUS = 2
-COS_FILTER_POWER = 1.0  # input images are multiplied by a cosine mask, with a value 1.0 in the center of the image and 0.0 at the edges; e.g. for an N x N sized image, the mask is (cos((px_x - N//2) * pi / N) * cos((px_y - N//2) * pi / N)) ** COS_FILTER_POWER, with px_x/y the pixel coordinate. Raising the filter to a low power, e.g. 0.33, makes it affect the central region of the image less.
+COS_FILTER_POWER = 0.5  # input images are multiplied by a cosine mask, with a value 1.0 in the center of the image and 0.0 at the edges; e.g. for an N x N sized image, the mask is (cos((px_x - N//2) * pi / N) * cos((px_y - N//2) * pi / N)) ** COS_FILTER_POWER, with px_x/y the pixel coordinate. Raising the filter to a low power, e.g. 0.33, makes it affect the central region of the image less.
 GLFW_CONTEXT_VERSION_MAJOR = 3  # user can change the GLFW/GL version prior to calling pyGPUreg.init() but code was not tested with any other version than 3.3
 GLFW_CONTEXT_VERSION_MINOR = 3  # user can change the GLFW/GL version prior to calling pyGPUreg.init() but code was not tested with any other version than 3.3
 
@@ -29,6 +29,11 @@ cs_fft_pi: Shader
 cs_multiply: Shader
 cs_resample: Shader
 cs_cosft: Shader
+cs_fft_single : Shader
+cs_fft_pi_single : Shader
+cs_multiply_single : Shader
+cs_copy_r_to_rg: Shader
+cs_cosft_single: Shader
 
 texture_butterfly: Texture
 texture_cos_mask: Texture
@@ -36,7 +41,11 @@ texture_data: Texture
 texture_data_buffer: Texture
 texture_resample_a: Texture
 texture_resample_b: Texture
-
+texture_r_t: Texture
+texture_r_i: Texture
+texture_rg_T: Texture
+texture_rg_I: Texture
+texture_rg_buffer: Texture
 
 def init(create_window=True, image_size=None):
     """
@@ -44,7 +53,8 @@ def init(create_window=True, image_size=None):
     :param create_window: bool (default True). When True, pyGPUreg creates a glfw window context for OpenGL. When using pyGPUreg within a project that already has an OpenGL context, no window needs to be created.
     :param image_size: None or int. must be a power of 2. Specify the size of the input images in order to reserve space on the GPU. Can be changed after calling init() by calling set_image_size(image_size) - is also changed automatically when cross_correlation() is called with arguments of a different shape than the previously set image size. When None, textures are not initialized until they are actually needed.
     """
-    global window, cs_butterfly, cs_cosft, cs_fft, cs_fft_pi, cs_multiply, cs_resample
+    global window, cs_butterfly, cs_cosft, cs_fft, cs_fft_pi, cs_multiply, cs_resample, cs_fft_single, cs_fft_pi_single, cs_multiply_single, cs_copy_r_to_rg, cs_cosft_single
+
     if create_window:
         if not glfw.init():
             raise Exception("Could not initialize GLFW")
@@ -59,21 +69,27 @@ def init(create_window=True, image_size=None):
         glfw.make_context_current(window)
 
     # compile shaders
-    shader_dir = os.path.join(os.path.dirname(__file__))+"/shaders"
-    cs_butterfly = Shader(shader_dir + "/butterflytexture.glsl")
-    cs_cosft = Shader(shader_dir + "/cos_filter.glsl")
-    cs_fft = Shader(shader_dir + "/fft.glsl")
-    cs_fft_pi = Shader(shader_dir + "/fft_inversion_permutation.glsl")
-    cs_multiply = Shader(shader_dir + "/fft_phase_correlation.glsl")
-    cs_resample = Shader(shader_dir + "/resample_image.glsl")
+    shader_dir = os.path.join(os.path.dirname(__file__))+"\\shaders\\"
+    cs_butterfly = Shader(shader_dir + "butterflytexture.glsl")
+    cs_cosft = Shader(shader_dir + "cos_filter.glsl")
+    cs_fft = Shader(shader_dir + "fft.glsl")
+    cs_fft_pi = Shader(shader_dir + "fft_inversion_permutation.glsl")
+    cs_multiply = Shader(shader_dir + "fft_phase_correlation.glsl")
+    cs_resample = Shader(shader_dir + "resample_image.glsl")
 
+    cs_fft_single = Shader(shader_dir + "fft_single.glsl")
+    cs_fft_pi_single = Shader(shader_dir + "fft_inversion_permutation_single.glsl")
+    cs_multiply_single = Shader(shader_dir + "fft_phase_correlation_single.glsl")
+    cs_copy_r_to_rg = Shader(shader_dir + "copy_r_to_rg.glsl")
+    cs_cosft_single = Shader(shader_dir + "cos_filter_r.glsl")
     # create textures with set_image_size
     if image_size is not None:
         set_image_size(image_size)
 
 
 def set_image_size(size):
-    global image_size, log_image_size, compute_space_size, texture_butterfly, texture_cos_mask, texture_data, texture_data_buffer, texture_resample_a, texture_resample_b
+    global image_size, log_image_size, compute_space_size, texture_butterfly, texture_cos_mask, texture_data, texture_data_buffer, texture_resample_a, texture_resample_b, texture_r_t, texture_r_i, texture_rg_T, texture_rg_I, texture_rg_buffer
+
     # check size
     N = int(size)
     logN = int(math.log2(N))
@@ -100,6 +116,16 @@ def set_image_size(size):
     texture_resample_a.update(pixeldata=None, width=N, height=N)
     texture_resample_b = Texture(format="r32f")
     texture_resample_b.update(pixeldata=None, width=N, height=N)
+    texture_r_t = Texture(format="r32f")
+    texture_r_t.update(pixeldata=None, width=N, height=N)
+    texture_r_i = Texture(format="r32f")
+    texture_r_i.update(pixeldata=None, width=N, height=N)
+    texture_rg_T = Texture(format="rg32f")
+    texture_rg_T.update(pixeldata=None, width=N, height=N)
+    texture_rg_I = Texture(format="rg32f")
+    texture_rg_I.update(pixeldata=None, width=N, height=N)
+    texture_rg_buffer = Texture(format="rg32f")
+    texture_rg_buffer.update(pixeldata=None, width=N, height=N)
 
     # fill butterfly texture
     def bit_reverse(val, N):
@@ -128,6 +154,68 @@ def set_image_size(size):
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
 
     cs_butterfly.unbind()
+
+def detect_subpixel_maximum(pcorr, mode):
+    shift = np.zeros(2)
+    if mode == SUBPIXEL_MODE_NONE:
+        shift = np.array(np.unravel_index(np.argmax(pcorr), pcorr.shape))  # find index of maximum in xcorr, convert to xy coordinate, convert to np array
+    elif mode == SUBPIXEL_MODE_COM:
+        mass = 0
+        peak_xy = np.array(np.unravel_index(np.argmax(pcorr), pcorr.shape))
+        x_coords = np.mod(np.array(range(max([0, peak_xy[0] - COM_RADIUS]), min([image_size, peak_xy[0] + COM_RADIUS + 1]))), image_size)
+        y_coords = np.mod(np.array(range(max([0, peak_xy[1] - COM_RADIUS]), min([image_size, peak_xy[1] + COM_RADIUS + 1]))), image_size)
+        for x in x_coords:
+            for y in y_coords:
+                pc_val = pcorr[x, y]
+                shift[0] += x * pc_val
+                shift[1] += y * pc_val
+                mass += pc_val
+        shift /= mass
+
+    x_shift = image_size / 2 - shift[0]
+    y_shift = image_size / 2 - shift[1]
+    if log_image_size % 2 == 0:  # when logN is even, change the sign of the shift.
+        x_shift = -x_shift
+        y_shift = -y_shift
+    return x_shift, y_shift
+
+def sample_texture_with_shift(texture, shift, edge_mode=EDGE_MODE_ZERO, interpolation_mode=INTERPOLATION_MODE_LINEAR):
+    """
+    Identical to sample_image_with_shift(), except requires manual uploading of pixeldata to a texture and takes the texture as argument.
+    """
+    texture.bind()
+    # set edge and interpolation mode for that texture
+    if edge_mode in [EDGE_MODE_ZERO, EDGE_MODE_CLAMP]:
+        glTexParameter(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        glTexParameter(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+    elif edge_mode == EDGE_MODE_REFLECT:
+        glTexParameter(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT)
+        glTexParameter(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT)
+    if interpolation_mode == INTERPOLATION_MODE_NEAREST:
+        glTexParameter(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        glTexParameter(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+    elif interpolation_mode == INTERPOLATION_MODE_LINEAR:
+        glTexParameter(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glTexParameter(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+
+    texture_resample_b.update(None, width=image_size, height=image_size)  # empty the buffer texture into which the original image is copied
+    cs_resample.bind()  # bind compute shader, upload uniforms, bind textures, dispatch
+    cs_resample.uniform1f("dx", float(shift[0]))
+    cs_resample.uniform1f("dy", float(shift[1]))
+    cs_resample.uniform1i("N", image_size)
+    cs_resample.uniform1i("edge_mode", edge_mode)
+    texture_resample_a.bind(0)
+    glBindImageTexture(1, texture_resample_b.renderer_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F)
+    glDispatchCompute(*compute_space_size)
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
+    cs_resample.unbind()
+
+    # copy result to CPU
+    texture_resample_b.bind()
+    resampled = glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT)
+    glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT)
+
+    return resampled
 
 
 def sample_image_with_shift(image, shift, edge_mode=EDGE_MODE_ZERO, interpolation_mode=INTERPOLATION_MODE_LINEAR):
@@ -274,26 +362,16 @@ def gpu_fft(image, image2=None):
         return fourier_transforms[:, :, 0] + 1j * fourier_transforms[:, :, 1]
 
 
-def _debug_export_texture(texture, title):
-    import tifffile
-    texture.bind()
-    rgba = glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT)
-    tifffile.imwrite(f"C:/Users/mgflast/Desktop/pyGPUreg/{title}_r.tif", rgba[:, :, 0])
-    tifffile.imwrite(f"C:/Users/mgflast/Desktop/pyGPUreg/{title}_g.tif", rgba[:, :, 1])
-    tifffile.imwrite(f"C:/Users/mgflast/Desktop/pyGPUreg/{title}_b.tif", rgba[:, :, 2])
-    tifffile.imwrite(f"C:/Users/mgflast/Desktop/pyGPUreg/{title}_a.tif", rgba[:, :, 3])
-
-
-def phase_correlation(template_image, moved_image, apply_shift=True, edge_mode=EDGE_MODE_ZERO, subpixel_mode=SUBPIXEL_MODE_COM, interpolation_mode=INTERPOLATION_MODE_LINEAR):
+def register(template_image, moved_image, apply_shift=True, edge_mode=EDGE_MODE_ZERO, subpixel_mode=SUBPIXEL_MODE_COM, interpolation_mode=INTERPOLATION_MODE_LINEAR):
     """
-    Compute the phase correlation of a template and moved image in order to detect the shift between template and moved image. Optionally also resamples the moved image to undo the shift.
+    Register moved_image onto template_image by computing the phase correlation of a template and moved image in order to detect the shift between template and moved image. Optionally also resamples the moved image to undo the shift.
     :param template_image: 2d numpy array of pixel data for the template image.
     :param moved_image: 2d numpy array of pixel data for the image that is to be moved onto the template image.
     :param apply_shift: bool (default True), when True, the function returns a re-sampled version of image2 with the detected shift applied. When False, function returns the shift (dx, dy)
     :param edge_mode: one of pyGPUreg.EDGE_MODE_ZERO (default), .EDGE_MODE_CLAMP, or .EDGE_MODE_REFLECT. Zero: pixels outside of original image are set to zero. Clamp: pixel values are clamped to the edge of the original image. Reflect: image is reflected along the edges.
     :param subpixel_mode: one of pyGPUreg.SUBPIXEL_MODE_NONE, .SUBPIXEL_MODE_COM (default). None: amplitude shift is detected with pixel accuracy, meaning the shift resolution is at best 1 pixel. COM: Center of mass - peak is detected and the sub-pixel position estimated based on the center of mass of the peak. Edit the value of pyGPUreg.COM_RADIUS (int, default 2) to change the radius of the mask used in the c.o.m. estimation.
     :param interpolation_mode: either pygpureg.INTERPOLATION_MODE_LINEAR (default) or pygpureg.INTERPOLATION_MODE_NEAREST. Note that when a detected shift is less than a pixel, resampling the image with Nearest interpolation will have no effect.
-    :return: shift (dx, dy) if apply_shift=False, else tuple (registered_image, (dx, dy))) with registered_image as a numpy array
+    :return: tuple (registered_image, (dx, dy))) with registered_image a 2D numpy array, OR (dx, dy) if apply_shift=False
     """
     if image_size != template_image.shape[0]:
         set_image_size(template_image.shape[0])
@@ -335,36 +413,10 @@ def phase_correlation(template_image, moved_image, apply_shift=True, edge_mode=E
     bind_and_launch_fft_compute_shaders(do_inversion_permutation=False)
     glMemoryBarrier(GL_TEXTURE_UPDATE_BARRIER_BIT)
 
-    def detect_subpixel_maximum(pcorr, mode):
-        shift = np.zeros(2)
-        if mode == SUBPIXEL_MODE_NONE:
-            shift = np.array(np.unravel_index(np.argmax(pcorr), pcorr.shape))  # find index of maximum in xcorr, convert to xy coordinate, convert to np array
-        elif mode == SUBPIXEL_MODE_COM:
-            mass = 0
-            peak_xy = np.array(np.unravel_index(np.argmax(pcorr), pcorr.shape))
-            x_coords = np.mod(np.array(range(max([0, peak_xy[0] - COM_RADIUS]), min([image_size, peak_xy[0] + COM_RADIUS + 1]))), image_size)
-            y_coords = np.mod(np.array(range(max([0, peak_xy[1] - COM_RADIUS]), min([image_size, peak_xy[1] + COM_RADIUS + 1]))), image_size)
-            for x in x_coords:
-                for y in y_coords:
-                    pc_val = pcorr[x, y]
-                    shift[0] += x * pc_val
-                    shift[1] += y * pc_val
-                    mass += pc_val
-            shift /= mass
-
-        x_shift = image_size / 2 - shift[0]
-        y_shift = image_size / 2 - shift[1]
-        if log_image_size % 2 == 0:  # when logN is even, change the sign of the shift.
-            x_shift = -x_shift
-            y_shift = -y_shift
-        return x_shift, y_shift
-
-    # get amplitude correlation image and find maximum
+    # get phase correlation image and find maximum
     texture_data.bind()
     pcorr = np.fft.fftshift(glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT), axes=(0, 1))
-    pcorr[image_size//2, image_size//2] = 0
-    #import tifffile
-    #tifffile.imwrite(f"C:/Users/mgflast/Desktop/pyGPUreg/temp/{time.time()}.tif", pcorr)
+    #pcorr[image_size//2, image_size//2] = 0
     dx, dy = detect_subpixel_maximum(pcorr, mode=subpixel_mode)
     if not apply_shift:
         return dx, dy
@@ -374,4 +426,133 @@ def phase_correlation(template_image, moved_image, apply_shift=True, edge_mode=E
     return resampled, (dx, dy)
 
 
+def bind_and_launch_fft_single_compute_shaders(ft_texture, do_inversion_permutation=True):
+    cs_fft_single.bind()
+    cs_fft_single.uniform1i("direction", 0)
+    glBindImageTexture(0, texture_butterfly.renderer_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F)
+    glBindImageTexture(1, ft_texture.renderer_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG32F)
+    glBindImageTexture(2, texture_rg_buffer.renderer_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG32F)
 
+    pingpong = 0
+    for s in range(log_image_size):
+        cs_fft_single.uniform1i("pingpong", pingpong % 2)
+        cs_fft_single.uniform1i("stage", s)
+        glDispatchCompute(*compute_space_size)
+        pingpong += 1
+
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
+
+    # next, compute vertical FFTs
+    cs_fft_single.uniform1i("direction", 1)
+    for s in range(log_image_size):
+        cs_fft_single.uniform1i("pingpong", pingpong % 2)
+        cs_fft_single.uniform1i("stage", s)
+        glDispatchCompute(*compute_space_size)
+        pingpong += 1
+
+    cs_fft_single.unbind()
+
+    if not do_inversion_permutation:
+        return
+
+    # do inversion and permutation
+    cs_fft_pi_single.bind()
+    cs_fft_pi_single.uniform1i("pingpong", pingpong % 2)
+    cs_fft_pi_single.uniform1f("N", float(image_size))
+    glBindImageTexture(0, ft_texture.renderer_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG32F)
+    glDispatchCompute(*compute_space_size)
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
+    cs_fft_pi_single.unbind()
+
+    # FFT of the data that was initially in ft_texture r channel is now in ft_texture
+
+def _debug_show_img(texture, title):
+    texture.bind()
+    img = glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT)
+    plt.subplot(1, 2, 1)
+    plt.imshow(img[:, :, 0])
+    plt.title(title)
+    plt.subplot(1,2,2)
+    plt.imshow(img[:, :, 1])
+    plt.show()
+
+
+
+def set_template(template_image):
+    s = template_image.shape
+    if s[0] != image_size or s[1] != image_size:
+        raise Exception(f"Template image must be square and size {image_size}, or change size by calling pyGPUfit.set_image_size()")
+
+    # upload to GPU
+    cs_copy_r_to_rg.bind()
+    texture_r_t.update(template_image)
+    glBindImageTexture(0, texture_r_t.renderer_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F)
+    glBindImageTexture(1, texture_rg_T.renderer_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG32F)
+    glDispatchCompute(*compute_space_size)
+    cs_copy_r_to_rg.unbind()
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
+
+    # apply cosine filter
+    cs_cosft_single.bind()
+    glBindImageTexture(0, texture_cos_mask.renderer_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F)
+    glBindImageTexture(1, texture_rg_T.renderer_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG32F)
+    glDispatchCompute(*compute_space_size)
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
+    cs_cosft_single.unbind()
+
+    # compute FFT
+    bind_and_launch_fft_single_compute_shaders(texture_rg_T)
+
+
+def register_to_template(image, apply_shift=True, edge_mode=EDGE_MODE_ZERO, subpixel_mode=SUBPIXEL_MODE_COM, interpolation_mode=INTERPOLATION_MODE_LINEAR):
+    s = image.shape
+    if s[0] != image_size or s[1] != image_size:
+        raise Exception(
+            f"Template image must be square and size {image_size}, or change size by calling pyGPUfit.set_image_size()")
+
+    # upload to GPU
+    cs_copy_r_to_rg.bind()
+    texture_r_i.update(image)
+    glBindImageTexture(0, texture_r_i.renderer_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F)
+    glBindImageTexture(1, texture_rg_I.renderer_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG32F)
+    glDispatchCompute(*compute_space_size)
+    cs_copy_r_to_rg.unbind()
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
+
+
+    # apply cosine filter
+    cs_cosft_single.bind()
+    glBindImageTexture(0, texture_cos_mask.renderer_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F)
+    glBindImageTexture(1, texture_rg_I.renderer_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG32F)
+    glDispatchCompute(*compute_space_size)
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
+    cs_cosft_single.unbind()
+
+    # compute FFT
+    bind_and_launch_fft_single_compute_shaders(texture_rg_I)
+    _debug_show_img(texture_rg_I, "input FFT")
+    # compute phase correlation
+    cs_multiply_single.bind()
+    glBindImageTexture(0, texture_rg_T.renderer_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RG32F)
+    glBindImageTexture(1, texture_rg_I.renderer_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG32F)
+    glDispatchCompute(*compute_space_size)
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
+    cs_multiply_single.bind()
+    _debug_show_img(texture_rg_I, "phase corr FFT")
+    # phase correlation is now in texture_rg_I. Compute its FFT.
+    bind_and_launch_fft_single_compute_shaders(texture_rg_I, do_inversion_permutation=False)
+    glMemoryBarrier(GL_TEXTURE_UPDATE_BARRIER_BIT)
+
+    _debug_show_img(texture_rg_I, "phase corre INverse FFT")
+    # get phase correlation image and find maximum
+    texture_rg_I.bind()
+    pcorr = np.fft.fftshift(glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT), axes=(0, 1))
+    #pcorr[image_size//2, image_size//2] = 0
+    plt.imshow(pcorr)
+    plt.show()
+    dx, dy = detect_subpixel_maximum(pcorr, mode=subpixel_mode)
+    if not apply_shift:
+        return dx, dy
+
+    resampled = sample_texture_with_shift(texture_r_i, (dx, dy), edge_mode, interpolation_mode)
+    return resampled, (dx, dy)
