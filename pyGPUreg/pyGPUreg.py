@@ -155,6 +155,7 @@ def set_image_size(size):
 
     cs_butterfly.unbind()
 
+
 def detect_subpixel_maximum(pcorr, mode):
     shift = np.zeros(2)
     if mode == SUBPIXEL_MODE_NONE:
@@ -174,10 +175,10 @@ def detect_subpixel_maximum(pcorr, mode):
 
     x_shift = image_size / 2 - shift[0]
     y_shift = image_size / 2 - shift[1]
-    if log_image_size % 2 == 0:  # when logN is even, change the sign of the shift.
-        x_shift = -x_shift
-        y_shift = -y_shift
+    x_shift = -x_shift
+    y_shift = -y_shift
     return x_shift, y_shift
+
 
 def sample_texture_with_shift(texture, shift, edge_mode=EDGE_MODE_ZERO, interpolation_mode=INTERPOLATION_MODE_LINEAR):
     """
@@ -204,14 +205,14 @@ def sample_texture_with_shift(texture, shift, edge_mode=EDGE_MODE_ZERO, interpol
     cs_resample.uniform1f("dy", float(shift[1]))
     cs_resample.uniform1i("N", image_size)
     cs_resample.uniform1i("edge_mode", edge_mode)
-    texture_resample_a.bind(0)
+    texture.bind(0)
     glBindImageTexture(1, texture_resample_b.renderer_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F)
     glDispatchCompute(*compute_space_size)
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
     cs_resample.unbind()
 
     # copy result to CPU
-    texture_resample_b.bind()
+    texture_resample_b.bind(0)
     resampled = glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT)
     glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT)
 
@@ -384,14 +385,12 @@ def register(template_image, moved_image, apply_shift=True, edge_mode=EDGE_MODE_
         raise Exception(
             f"Image size is {template_image.shape} but should be ({image_size}, {image_size}). Call pyGPUreg.set_image_size() to change the expected image size")
 
-    import time
-    timer = time.time_ns()
-
     data = np.zeros((image_size, image_size, 4))
     data[:, :, 0] = template_image
     if moved_image is not None:
         data[:, :, 2] = moved_image
 
+    # upload data
     texture_data.update(data)
 
     # apply cosine filter
@@ -400,27 +399,24 @@ def register(template_image, moved_image, apply_shift=True, edge_mode=EDGE_MODE_
     # forward FFTs
     bind_and_launch_fft_compute_shaders()
 
-
-    # use the cs_multiply compute shader to calculate the product of the Fourier transforms
+    # use the cs_multiply compute shader to calculate the phase correlation
     cs_multiply.bind()
     glBindImageTexture(0, texture_data.renderer_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F)
     glDispatchCompute(*compute_space_size)
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
     cs_multiply.unbind()
 
-
-    # forward FFTs again to get cross correlation (without amplitude scaling.)
+    # forward FFTs again to get cross correlation
     bind_and_launch_fft_compute_shaders(do_inversion_permutation=False)
     glMemoryBarrier(GL_TEXTURE_UPDATE_BARRIER_BIT)
 
     # get phase correlation image and find maximum
     texture_data.bind()
     pcorr = np.fft.fftshift(glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT), axes=(0, 1))
-    #pcorr[image_size//2, image_size//2] = 0
+    pcorr[image_size//2, image_size//2] = (pcorr[image_size//2 + 1, image_size//2] + pcorr[image_size//2 - 1, image_size//2] + pcorr[image_size//2, image_size//2 + 1] + pcorr[image_size//2, image_size//2 - 1]) / 4
     dx, dy = detect_subpixel_maximum(pcorr, mode=subpixel_mode)
     if not apply_shift:
         return dx, dy
-
 
     resampled = sample_image_with_shift(moved_image, (dx, dy), edge_mode, interpolation_mode)
     return resampled, (dx, dy)
@@ -465,17 +461,6 @@ def bind_and_launch_fft_single_compute_shaders(ft_texture, do_inversion_permutat
     cs_fft_pi_single.unbind()
 
     # FFT of the data that was initially in ft_texture r channel is now in ft_texture
-
-def _debug_show_img(texture, title):
-    texture.bind()
-    img = glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT)
-    plt.subplot(1, 2, 1)
-    plt.imshow(img[:, :, 0])
-    plt.title(title)
-    plt.subplot(1,2,2)
-    plt.imshow(img[:, :, 1])
-    plt.show()
-
 
 
 def set_template(template_image):
@@ -544,7 +529,7 @@ def register_to_template(image, apply_shift=True, edge_mode=EDGE_MODE_ZERO, subp
     # get phase correlation image and find maximum
     texture_rg_I.bind()
     pcorr = np.fft.fftshift(glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT), axes=(0, 1))
-    #pcorr[image_size//2, image_size//2] = 0
+    pcorr[image_size//2, image_size//2] = (pcorr[image_size//2 + 1, image_size//2] + pcorr[image_size//2 - 1, image_size//2] + pcorr[image_size//2, image_size//2 + 1] + pcorr[image_size//2, image_size//2 - 1]) / 4
     dx, dy = detect_subpixel_maximum(pcorr, mode=subpixel_mode)
     if not apply_shift:
         return dx, dy

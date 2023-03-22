@@ -13,7 +13,7 @@ uniform int edge_mode;
 void main(void)
 {
     ivec2 x = ivec2(gl_GlobalInvocationID.xy);
-    vec2 sample_x = (x + vec2(dy, dx)) / N;
+    vec2 sample_x = (x + vec2(dx, dy)) / N;
     if (edge_mode > 0)
     {
         imageStore(shifted_image, x, texture(original_image, sample_x));
