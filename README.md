@@ -20,10 +20,10 @@ Prior to calling any of the core functions, pyGPUreg has to be initialized.
 ```
 import pyGPUreg as reg
 
-reg.init(create_window=True)
+reg.init()
 ```
 
-We use glfw to create an OpenGL context, and since glfw requires a window to be opened we create a hidden window in the init function. As a user you can ignore this, except if you want to use pyGPUreg within an application that already has an OpenGL context. In that case, call init() with create_window=False.
+pyGPUreg uses glfw to create an OpenGL context. In .init(), a hidden window is opened, as glfw requires a window for an OpenGL context to be created. Whenever a pyGPUreg function is called after .init(), the module activates its own context and, if another glfw context was active before the function call, swaps back at the end of the function. This way, pyGPUreg can be agnostic of whether it is used in an application where other glfw/OpenGL contexts are used. 
 
 #### Templated drift correction (fastest method) ####
 Communication between GPU and CPU is the bottleneck in pyGPUreg. For optimal processing speed, uploads to the GPU must be kept to a minimum. This can be done with 'templated' drift correction: a correction template is manually set and uploaded separately from subsequent to-be-corrected images. If you want to register many images to the same template, this method is best. 
