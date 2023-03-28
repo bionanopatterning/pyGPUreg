@@ -10,7 +10,7 @@ When tested on a Quadro P2200, pyGPUreg is more than 40x faster than StackReg, t
 For now, pyGPUreg only works on images that are square and with size 2^n (e.g. 128, 256, 512, etc. pixel width and height)
 
 #### Installation ####
-pyGPUreg is available on pypi. Install with pip using the this command:
+pyGPUreg is available on pypi. Install with pip using this command:
 ```
 pip install pyGPUreg
 ```
