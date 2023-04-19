@@ -183,6 +183,7 @@ def detect_subpixel_maximum(pcorr, mode):
 def sample_texture_with_shift(texture, shift, edge_mode=EDGE_MODE_ZERO, interpolation_mode=INTERPOLATION_MODE_LINEAR):
     """
     Identical to sample_image_with_shift(), except requires manual uploading of pixeldata to a texture and takes the texture as argument.
+    When using pyGPUreg in an application with multiple openGL contexts, use of this functions requires manual context managing as well.
     """
     texture.bind()
     # set edge and interpolation mode for that texture
@@ -219,6 +220,8 @@ def sample_texture_with_shift(texture, shift, edge_mode=EDGE_MODE_ZERO, interpol
     texture_resample_b.bind()
     resampled = glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT)
     glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT)
+
+    resampled = np.reshape(resampled, (height, width))
 
     return resampled
 

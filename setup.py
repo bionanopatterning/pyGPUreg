@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='pyGPUreg',
-    version='0.1.0',
+    version='0.1.1',
     license='GPLv3',
     author="Mart G.F. Last",
     author_email='m.g.f.last@lumc.nl',
