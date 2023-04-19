@@ -11,7 +11,7 @@ void main(void)
     vec2 T = imageLoad(FT_T, x).rg;
     vec2 I = imageLoad(FT_I, x).rg;
     float amplitude = sqrt(pow(T.r * I.r + T.g * I.g, 2) + pow(I.r * T.g - T.r * I.g, 2));
-    float real = (T.r * I.r + T.g * I.r) / amplitude;
+    float real = (T.r * I.r + T.g * I.g) / amplitude;
     float imag = (I.r * T.g - T.r * I.g) / amplitude;
     imageStore(FT_I, x, vec4(real, imag, 0.0, 0.0));
 }

@@ -7,13 +7,14 @@ layout(binding = 1, r32f) uniform image2D shifted_image;
 
 uniform float dx;
 uniform float dy;
-uniform int N;
+uniform int W;
+uniform int H;
 uniform int edge_mode;
 
 void main(void)
 {
     ivec2 x = ivec2(gl_GlobalInvocationID.xy);
-    vec2 sample_x = (x + vec2(dx, dy)) / N;
+    vec2 sample_x = (x + vec2(dx, dy)) / vec2(W, H);
     if (edge_mode > 0)
     {
         imageStore(shifted_image, x, texture(original_image, sample_x));
