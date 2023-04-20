@@ -70,19 +70,18 @@ def init():
     glfw.make_context_current(window)
 
     # compile shaders
-    shader_dir = os.path.join(os.path.dirname(__file__))+"\\shaders\\"
-    cs_butterfly = Shader(shader_dir + "butterflytexture.glsl")
-    cs_cosft = Shader(shader_dir + "cos_filter.glsl")
-    cs_fft = Shader(shader_dir + "fft.glsl")
-    cs_fft_pi = Shader(shader_dir + "fft_inversion_permutation.glsl")
-    cs_multiply = Shader(shader_dir + "fft_phase_correlation.glsl")
-    cs_resample = Shader(shader_dir + "resample_image.glsl")
-
-    cs_fft_single = Shader(shader_dir + "fft_single.glsl")
-    cs_fft_pi_single = Shader(shader_dir + "fft_inversion_permutation_single.glsl")
-    cs_multiply_single = Shader(shader_dir + "fft_phase_correlation_single.glsl")
-    cs_copy_r_to_rg = Shader(shader_dir + "copy_r_to_rg.glsl")
-    cs_cosft_single = Shader(shader_dir + "cos_filter_r.glsl")
+    shader_dir = os.path.join(os.path.dirname(__file__), "shaders")
+    cs_butterfly = Shader(os.path.join(shader_dir, "butterflytexture.glsl"))
+    cs_cosft = Shader(os.path.join(shader_dir, "cos_filter.glsl"))
+    cs_fft = Shader(os.path.join(shader_dir, "fft.glsl"))
+    cs_fft_pi = Shader(os.path.join(shader_dir, "fft_inversion_permutation.glsl"))
+    cs_multiply = Shader(os.path.join(shader_dir, "fft_phase_correlation.glsl"))
+    cs_resample = Shader(os.path.join(shader_dir, "resample_image.glsl"))
+    cs_fft_single = Shader(os.path.join(shader_dir, "fft_single.glsl"))
+    cs_fft_pi_single = Shader(os.path.join(shader_dir, "fft_inversion_permutation_single.glsl"))
+    cs_multiply_single = Shader(os.path.join(shader_dir, "fft_phase_correlation_single.glsl"))
+    cs_copy_r_to_rg = Shader(os.path.join(shader_dir, "copy_r_to_rg.glsl"))
+    cs_cosft_single = Shader(os.path.join(shader_dir, "cos_filter_r.glsl"))
 
 
 def set_image_size(size):
