@@ -70,7 +70,7 @@ def init():
     glfw.make_context_current(window)
 
     # compile shaders
-    shader_dir = os.path.join(os.path.dirname(__file__), "shaders")
+    shader_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),"shaders")
     cs_butterfly = Shader(os.path.join(shader_dir, "butterflytexture.glsl"))
     cs_cosft = Shader(os.path.join(shader_dir, "cos_filter.glsl"))
     cs_fft = Shader(os.path.join(shader_dir, "fft.glsl"))
@@ -579,4 +579,3 @@ def register_to_template(image, apply_shift=True, edge_mode=EDGE_MODE_ZERO, subp
     if window is not None:
         glfw.make_context_current(previous_context)
     return resampled, (dx, dy)
-
