@@ -107,10 +107,10 @@ plt.subplot(1,3,3)
 fft = np.fft.fftshift(np.fft.fft2(img), axes=(0, 1))
 plt.imshow(np.absolute(fft))
 
-
-contact: mgflast@gmail.com
 plt.title("numpy FFT")
 plt.show()
 ```
+
+contact: mgflast@gmail.com
 
 ![](res/FFT_example.PNG)
