@@ -111,6 +111,6 @@ plt.title("numpy FFT")
 plt.show()
 ```
 
-contact: mgflast@gmail.com
-
 ![](res/FFT_example.PNG)
+
+contact: mgflast@gmail.com
